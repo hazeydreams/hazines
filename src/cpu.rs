@@ -40,6 +40,11 @@ impl Flags {
         self.zero = (data == 0);
         self.negative = (data & 0x80) != 0;
     }
+
+    fn update_carry_flag(&mut self, data: u16)
+    {
+        self.carry = (data & 0x100) != 0;
+    }
 }
 
 struct OpCode {
@@ -90,6 +95,13 @@ lazy_static! {
         OpCode::new(0x11, "AND", 2, 6, AddressingMode::Indirect_X),
         OpCode::new(0x11, "AND", 2, 5, AddressingMode::Indirect_Y),
 
+        // ASL
+        OpCode::new(0x0A, "ASL", 1, 2, AddressingMode::Accumulator),
+        OpCode::new(0x06, "ASL", 2, 5, AddressingMode::ZeroPage),
+        OpCode::new(0x16, "ASL", 2, 6, AddressingMode::ZeroPage_X),
+        OpCode::new(0x0E, "ASL", 3, 6, AddressingMode::Absolute),
+        OpCode::new(0x1E, "ASL", 3, 7, AddressingMode::Absolute_X),
+
     ];
 }
 
@@ -136,6 +148,7 @@ impl Cpu {
                     "ADC" => self.adc(&opcode.addressing_mode),
                     "LDA" => self.lda(&opcode.addressing_mode),
                     "AND" => self.and(&opcode.addressing_mode),
+                    "ASL" => self.asl(&opcode.addressing_mode),
                     _ => panic!("No routine to handle instruction {}", opcode.tag),
                 }
 
@@ -247,6 +260,29 @@ impl Cpu {
         }
     }
 
+    /// Shift all bits of the accumulator or a memory location by one bit left. Carry is set if the 
+    /// result does not fit within 8-bits
+    /// 
+    /// A = A*2 or M=M*2
+    /// 
+    /// Flags Effected: Z, N, C
+    fn asl(&mut self, mode: &AddressingMode)
+    {
+        if let Some(param) = self.find_operand_parameter(mode) {
+
+            let param: u16 = (param as u16) << 1;
+
+            self.flags.update_zero_negative_flags(param as u8);
+            self.flags.update_carry_flag(param);
+
+            if let Some(addr) = self.find_operand_address(mode) {
+                self.mem_write(addr, param as u8);
+            } else if matches!(mode, AddressingMode::Accumulator) {
+                self.register_a = param as u8;
+            }
+        }
+    }
+
 }
 
 #[cfg(test)]
@@ -312,5 +348,14 @@ mod test {
         cpu.run();
 
         assert_eq!(cpu.register_a, 0x01);
+    }
+
+    #[test]
+    fn test_0x0a_asl_accumulator() {
+        let mut cpu = Cpu::new();
+        cpu.load_program(vec![0xa9, 0x1, 0x0A, 0x00]);
+        cpu.run();
+
+        assert_eq!(cpu.register_a, 0x02);
     }
 }
