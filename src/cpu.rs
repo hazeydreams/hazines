@@ -64,6 +64,7 @@ impl OpCode {
 lazy_static! {
     static ref CPU_INSTRUCTION_SET: Vec<OpCode> = vec![
         OpCode::new(0x00, "BRK", 1, 7, AddressingMode::NoAddressing),
+        OpCode::new(0xEA, "NOP", 1, 2, AddressingMode::NoAddressing),
 
         // ADC
         OpCode::new(0x69, "ADC", 2, 2, AddressingMode::Immediate),
@@ -101,6 +102,12 @@ lazy_static! {
         OpCode::new(0x16, "ASL", 2, 6, AddressingMode::ZeroPage_X),
         OpCode::new(0x0E, "ASL", 3, 6, AddressingMode::Absolute),
         OpCode::new(0x1E, "ASL", 3, 7, AddressingMode::Absolute_X),
+
+        // Set FLAG Opcodes
+        OpCode::new(0x38, "SEC", 1, 2, AddressingMode::NoAddressing),
+        OpCode::new(0xF8, "SED", 1, 2, AddressingMode::NoAddressing),
+        OpCode::new(0x78, "SEI", 1, 2, AddressingMode::NoAddressing),
+
 
     ];
 }
@@ -149,6 +156,9 @@ impl Cpu {
                     "LDA" => self.lda(&opcode.addressing_mode),
                     "AND" => self.and(&opcode.addressing_mode),
                     "ASL" => self.asl(&opcode.addressing_mode),
+                    "SEC" => self.sec(&opcode.addressing_mode),
+                    "SED" => self.sed(&opcode.addressing_mode),
+                    "SEI" => self.sei(&opcode.addressing_mode),
                     _ => panic!("No routine to handle instruction {}", opcode.tag),
                 }
 
@@ -283,6 +293,20 @@ impl Cpu {
         }
     }
 
+    // Set Flag Opcodes
+
+    fn sec(&mut self, _: &AddressingMode) {
+        self.flags.carry = true;
+    }
+
+    fn sed(&mut self, _: &AddressingMode) {
+        self.flags.decimal_mode= true;
+    }
+
+    fn sei(&mut self, _: &AddressingMode) {
+        self.flags.interrupt_disable = true;
+    }
+
 }
 
 #[cfg(test)]
@@ -357,5 +381,32 @@ mod test {
         cpu.run();
 
         assert_eq!(cpu.register_a, 0x02);
+    }
+
+    #[test]
+    fn test_0x38_sec() {
+        let mut cpu = Cpu::new();
+        cpu.load_program(vec![0x38, 0x00]);
+        cpu.run();
+
+        assert_eq!(cpu.flags.carry, true);
+    }
+    
+    #[test]
+    fn test_0xf8_sed() {
+        let mut cpu = Cpu::new();
+        cpu.load_program(vec![0xf8, 0x00]);
+        cpu.run();
+
+        assert_eq!(cpu.flags.decimal_mode, true);
+    }
+
+    #[test]
+    fn test_0x78_sei() {
+        let mut cpu = Cpu::new();
+        cpu.load_program(vec![0x78, 0x00]);
+        cpu.run();
+
+        assert_eq!(cpu.flags.interrupt_disable, true);
     }
 }
