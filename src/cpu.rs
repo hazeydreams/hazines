@@ -103,10 +103,14 @@ lazy_static! {
         OpCode::new(0x0E, "ASL", 3, 6, AddressingMode::Absolute),
         OpCode::new(0x1E, "ASL", 3, 7, AddressingMode::Absolute_X),
 
-        // Set FLAG Opcodes
+        // FLAG Opcodes
         OpCode::new(0x38, "SEC", 1, 2, AddressingMode::NoAddressing),
         OpCode::new(0xF8, "SED", 1, 2, AddressingMode::NoAddressing),
         OpCode::new(0x78, "SEI", 1, 2, AddressingMode::NoAddressing),
+        OpCode::new(0x18, "CLC", 1, 2, AddressingMode::NoAddressing),
+        OpCode::new(0xD8, "CLD", 1, 2, AddressingMode::NoAddressing),
+        OpCode::new(0x58, "CLI", 1, 2, AddressingMode::NoAddressing),
+        OpCode::new(0xB8, "CLV", 1, 2, AddressingMode::NoAddressing),
 
 
     ];
@@ -156,9 +160,13 @@ impl Cpu {
                     "LDA" => self.lda(&opcode.addressing_mode),
                     "AND" => self.and(&opcode.addressing_mode),
                     "ASL" => self.asl(&opcode.addressing_mode),
-                    "SEC" => self.sec(&opcode.addressing_mode),
-                    "SED" => self.sed(&opcode.addressing_mode),
-                    "SEI" => self.sei(&opcode.addressing_mode),
+                    "SEC" => self.sec(),
+                    "SED" => self.sed(),
+                    "SEI" => self.sei(),
+                    "CLC" => self.clc(),
+                    "CLD" => self.cld(),
+                    "CLI" => self.cli(),
+                    "CLV" => self.clv(),
                     _ => panic!("No routine to handle instruction {}", opcode.tag),
                 }
 
@@ -294,17 +302,33 @@ impl Cpu {
     }
 
     // Set Flag Opcodes
-
-    fn sec(&mut self, _: &AddressingMode) {
+    fn sec(&mut self) {
         self.flags.carry = true;
     }
 
-    fn sed(&mut self, _: &AddressingMode) {
-        self.flags.decimal_mode= true;
+    fn sed(&mut self) {
+        self.flags.decimal_mode = true;
     }
 
-    fn sei(&mut self, _: &AddressingMode) {
+    fn sei(&mut self) {
         self.flags.interrupt_disable = true;
+    }
+
+    // Clear Flag Opcodes
+    fn clc(&mut self) {
+        self.flags.carry = false;
+    }
+
+    fn cld(&mut self) {
+        self.flags.decimal_mode = false;
+    }
+
+    fn cli (&mut self) {
+        self.flags.interrupt_disable = false;
+    }
+
+    fn clv(&mut self) {
+        self.flags.overflow = false;
     }
 
 }
@@ -408,5 +432,53 @@ mod test {
         cpu.run();
 
         assert_eq!(cpu.flags.interrupt_disable, true);
+    }
+
+    #[test]
+    fn test_0x18_clc() {
+        let mut cpu = Cpu::new();
+        cpu.load_program(vec![0x18, 0x00]);
+        
+        cpu.flags.carry = true;
+
+        cpu.run();
+
+        assert_eq!(cpu.flags.carry, true);
+    }
+    
+    #[test]
+    fn test_0xd8_cld() {
+        let mut cpu = Cpu::new();
+        cpu.load_program(vec![0xd8, 0x00]);
+        
+        cpu.flags.decimal_mode = true;
+
+        cpu.run();
+
+        assert_eq!(cpu.flags.decimal_mode, false);
+    }
+
+    #[test]
+    fn test_0x58_cli() {
+        let mut cpu = Cpu::new();
+        cpu.load_program(vec![0x58, 0x00]);
+
+        cpu.flags.interrupt_disable = true;
+
+        cpu.run();
+
+
+        assert_eq!(cpu.flags.interrupt_disable, false);
+    }
+    #[test]
+    fn test_0xb8_cli() {
+        let mut cpu = Cpu::new();
+        cpu.load_program(vec![0xb8, 0x00]);
+
+        cpu.flags.overflow = true;
+        
+        cpu.run();
+
+        assert_eq!(cpu.flags.overflow, false);
     }
 }
