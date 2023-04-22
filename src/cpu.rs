@@ -76,6 +76,17 @@ lazy_static! {
         OpCode::new(0xb9, "LDA", 3, 4, AddressingMode::Absolute_Y),
         OpCode::new(0xa1, "LDA", 2, 6, AddressingMode::Indirect_X),
         OpCode::new(0xb1, "LDA", 2, 5, AddressingMode::Indirect_Y),
+
+        // AND
+        OpCode::new(0x29, "AND", 2, 2, AddressingMode::Immediate),
+        OpCode::new(0x25, "AND", 2, 3, AddressingMode::ZeroPage),
+        OpCode::new(0x35, "AND", 2, 4, AddressingMode::ZeroPage_X),
+        OpCode::new(0x2d, "AND", 3, 4, AddressingMode::Absolute),
+        OpCode::new(0x2d, "AND", 3, 4, AddressingMode::Absolute_X),
+        OpCode::new(0x39, "AND", 3, 4, AddressingMode::Absolute_Y),
+        OpCode::new(0x11, "AND", 2, 6, AddressingMode::Indirect_X),
+        OpCode::new(0x11, "AND", 2, 5, AddressingMode::Indirect_Y),
+
     ];
 }
 
@@ -109,6 +120,7 @@ impl Cpu {
         }
     }
 
+    /// Run the program currently loaded into memory
     pub fn run(&mut self)
     {
         loop {
@@ -120,6 +132,7 @@ impl Cpu {
                     "BRK" => return,
                     "ADC" => self.adc(&opcode.addressing_mode),
                     "LDA" => self.lda(&opcode.addressing_mode),
+                    "AND" => self.and(&opcode.addressing_mode),
                     _ => panic!("No routine to handle instruction {}", opcode.tag),
                 }
 
@@ -128,7 +141,6 @@ impl Cpu {
                 panic!("Unknown instruction {}!", instruction);
             }
         }
-
     }
 
     fn mem_read(&self, addr: u16) -> u8 {
@@ -179,17 +191,17 @@ impl Cpu {
     }
 
     fn adc(&mut self, mode: &AddressingMode) {
-        let addr = self.find_operand_address(&mode);
-        let param = self.mem_read(addr);
+        // let addr = self.find_operand_address(&mode);
+        // let param = self.mem_read(addr);
 
-        let overflow: bool;
+        // let overflow: bool;
 
-        self.flags.update_zero_negative_flags(param);
-        self.register_a += param + self.
+        // self.flags.update_zero_negative_flags(param);
+        // self.register_a += param + self.
 
-        (self.register_a, overflow) = self.register_a.overflowing_add(param);
+        // (self.register_a, overflow) = self.register_a.overflowing_add(param);
 
-        self.flags.carry |= overflow;
+        // self.flags.carry |= overflow;
     }
 
     fn lda(&mut self, mode: &AddressingMode) {
@@ -198,6 +210,21 @@ impl Cpu {
 
         self.flags.update_zero_negative_flags(param);
         self.register_a = param;
+    }
+
+
+    /// A logical AND is performed on the accumulator and the contents of a byte of memory.
+    /// 
+    /// A = A&M
+    /// 
+    /// Flags Effected: Z, N
+    fn and(&mut self, mode: &AddressingMode)
+    {
+        let addr = self.find_operand_address(mode);
+        let param = self.mem_read(addr);
+
+        self.register_a = self.register_a & param;
+        self.flags.update_zero_negative_flags(self.register_a);
     }
 
 }
@@ -256,5 +283,14 @@ mod test {
         assert_eq!(cpu.register_a, 0x01);
         assert_eq!(cpu.flags.carry, true);
         assert_eq!(cpu.flags.negative, false);
+    }
+
+    #[test]
+    fn test_0x29_and_immediate() {
+        let mut cpu = Cpu::new();
+        cpu.load_program(vec![0xa9, 0x1, 0x29, 0x1, 0x00]);
+        cpu.run();
+
+        assert_eq!(cpu.register_a, 0x01);
     }
 }
