@@ -1,20 +1,23 @@
+use core::panic;
+
 use lazy_static::lazy_static;
 
 
 #[derive(Debug)]
 #[allow(non_camel_case_types)]
 pub enum AddressingMode {
-   Immediate,
-   ZeroPage,
-   ZeroPage_X,
-   ZeroPage_Y,
-   Absolute,
-   Absolute_X,
-   Absolute_Y,
-   Indirect,
-   Indirect_X,
-   Indirect_Y,
-   NoAddressing
+    Accumulator,
+    Immediate,
+    ZeroPage,
+    ZeroPage_X,
+    ZeroPage_Y,
+    Absolute,
+    Absolute_X,
+    Absolute_Y,
+    Indirect,
+    Indirect_X,
+    Indirect_Y,
+    NoAddressing
 }
 
 #[derive(Debug)]
@@ -164,30 +167,49 @@ impl Cpu {
         self.mem_write(addr + 1, hi);
     }
 
-    fn find_operand_address(&self, address_mode: &AddressingMode) -> u16
+    fn find_operand_address(&self, address_mode: &AddressingMode) -> Option<u16>
     {
         match address_mode {
-            AddressingMode::Immediate => self.program_counter,
-            AddressingMode::ZeroPage => self.mem_read(self.program_counter) as u16,
-            AddressingMode::Absolute => self.mem_read_u16(self.program_counter),
-            AddressingMode::ZeroPage_X => (self.mem_read(self.program_counter) as u16).wrapping_add(self.register_x as u16),
-            AddressingMode::ZeroPage_Y => (self.mem_read(self.program_counter) as u16).wrapping_add(self.register_y as u16),
-            AddressingMode::Absolute_X => (self.mem_read(self.program_counter) as u16).wrapping_add(self.register_x as u16),
-            AddressingMode::Absolute_Y => (self.mem_read(self.program_counter) as u16).wrapping_add(self.register_y as u16),
+            AddressingMode::Immediate => Some(self.program_counter),
+            AddressingMode::ZeroPage => Some(self.mem_read(self.program_counter) as u16),
+            AddressingMode::Absolute => Some(self.mem_read_u16(self.program_counter)),
+            AddressingMode::ZeroPage_X => Some((self.mem_read(self.program_counter) as u16).wrapping_add(self.register_x as u16)),
+            AddressingMode::ZeroPage_Y => Some((self.mem_read(self.program_counter) as u16).wrapping_add(self.register_y as u16)),
+            AddressingMode::Absolute_X => Some((self.mem_read(self.program_counter) as u16).wrapping_add(self.register_x as u16)),
+            AddressingMode::Absolute_Y => Some((self.mem_read(self.program_counter) as u16).wrapping_add(self.register_y as u16)),
             AddressingMode::Indirect => {
                 let p_addr = self.mem_read_u16(self.program_counter);
-                self.mem_read_u16(p_addr)
+                Some(self.mem_read_u16(p_addr))
             }
             AddressingMode::Indirect_X => {
                 let p_addr = self.mem_read_u16(self.program_counter);
-                self.mem_read_u16(p_addr).wrapping_add(self.register_x as u16)
+                Some(self.mem_read_u16(p_addr).wrapping_add(self.register_x as u16))
             }
             AddressingMode::Indirect_Y => {
                 let p_addr = self.mem_read_u16(self.program_counter);
-                self.mem_read_u16(p_addr).wrapping_add(self.register_y as u16)
+                Some(self.mem_read_u16(p_addr).wrapping_add(self.register_y as u16))
             }
-            AddressingMode::NoAddressing => panic!("Invalid addressing mode"),
+            AddressingMode::Accumulator => None,
+            AddressingMode::NoAddressing => None 
         }
+    }
+
+    fn find_operand_parameter(&self, address_mode: &AddressingMode) -> Option<u8>
+    {
+        let parameter: Option<u8>;
+
+        if let Some(addr) = self.find_operand_address(address_mode) {
+           parameter = Some(self.mem_read(addr)) 
+        } else {
+            parameter = match address_mode {
+                AddressingMode::Accumulator => {
+                    Some(self.register_a)
+                }
+                _ => None
+            }
+        }
+    
+        parameter
     }
 
     fn adc(&mut self, mode: &AddressingMode) {
@@ -205,11 +227,10 @@ impl Cpu {
     }
 
     fn lda(&mut self, mode: &AddressingMode) {
-        let addr = self.find_operand_address(&mode);
-        let param = self.mem_read(addr);
-
-        self.flags.update_zero_negative_flags(param);
-        self.register_a = param;
+        if let Some(param) = self.find_operand_parameter(mode) {
+            self.flags.update_zero_negative_flags(param);
+            self.register_a = param;
+        }
     }
 
 
@@ -220,11 +241,10 @@ impl Cpu {
     /// Flags Effected: Z, N
     fn and(&mut self, mode: &AddressingMode)
     {
-        let addr = self.find_operand_address(mode);
-        let param = self.mem_read(addr);
-
-        self.register_a = self.register_a & param;
-        self.flags.update_zero_negative_flags(self.register_a);
+        if let Some(param) = self.find_operand_parameter(mode) {
+            self.register_a = self.register_a & param;
+            self.flags.update_zero_negative_flags(self.register_a);
+        }
     }
 
 }
